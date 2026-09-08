@@ -14,24 +14,36 @@ export const generateWeeklyRoster = (
   const weekOts = ots.filter(o => o.weekNumber === weekNumber);
   const weekShiftChanges = shiftChanges.filter(sc => sc.weekNumber === weekNumber);
   
-  const rotationCycle = weekNumber % 3;
+  const [y, m, d] = startDate.split('-').map(Number);
+  const currentStartDate = new Date(y, m - 1, d);
+  const anchorDate = new Date(2026, 8, 5); // 2026-09-05 (Saturday)
+  
+  // Set hours to 0 to avoid DST shifting issues
+  currentStartDate.setHours(0, 0, 0, 0);
+  anchorDate.setHours(0, 0, 0, 0);
+  
+  const timeDiff = currentStartDate.getTime() - anchorDate.getTime();
+  const daysDiff = Math.round(timeDiff / (1000 * 60 * 60 * 24));
+  const weeksDiff = Math.floor(daysDiff / 7);
+  
+  const rotationCycle = ((weeksDiff % 3) + 3) % 3;
   
   const getAssignedShift = (permanentGroup: PermanentGroup): ShiftType => {
     if (permanentGroup === 'General') return 'General';
     if (permanentGroup === 'Reliever') return 'Reliever' as any;
     
     if (rotationCycle === 0) {
-      if (permanentGroup === 'A') return 'C';
-      if (permanentGroup === 'B') return 'A';
-      if (permanentGroup === 'C') return 'B';
-    } else if (rotationCycle === 1) {
-      if (permanentGroup === 'A') return 'B';
-      if (permanentGroup === 'B') return 'C';
-      if (permanentGroup === 'C') return 'A';
-    } else { // 2
       if (permanentGroup === 'A') return 'A';
       if (permanentGroup === 'B') return 'B';
       if (permanentGroup === 'C') return 'C';
+    } else if (rotationCycle === 1) {
+      if (permanentGroup === 'A') return 'C';
+      if (permanentGroup === 'B') return 'A';
+      if (permanentGroup === 'C') return 'B';
+    } else { // 2
+      if (permanentGroup === 'A') return 'B';
+      if (permanentGroup === 'B') return 'C';
+      if (permanentGroup === 'C') return 'A';
     }
     return 'General';
   };

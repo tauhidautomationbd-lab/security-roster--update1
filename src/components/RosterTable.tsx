@@ -10,9 +10,10 @@ interface Props {
   staff: Staff[];
 }
 
-import { getEndDate, formatDisplayDate } from '../utils/dateUtils';
+import { getWeekDateRange, formatDisplayDate } from '../utils/dateUtils';
 
 export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, posts, staff }) => {
+  const endDate = getWeekDateRange(weekNumber).end;
   // Group by Shift
   const grouped = useMemo(() => {
     const map: Record<ShiftType | 'OT', RosterAssignment[]> = {
@@ -59,19 +60,34 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
     Leave: { title: 'Leave / Off', time: 'ছুটি/অফ', color: 'bg-gray-100 text-gray-800' }
   };
 
-  const getPermanentGroupForRunningShift = (runningShift: ShiftType, week: number) => {
-    const rotationCycle = week % 3;
+  const getPermanentGroupForRunningShift = (runningShift: ShiftType, startDate: string) => {
+    const [y, m, d] = startDate.split('-').map(Number);
+    const currentStartDate = new Date(y, m - 1, d);
+    const anchorDate = new Date(2026, 8, 5); // 2026-09-05 (Saturday)
+    
+    currentStartDate.setHours(0, 0, 0, 0);
+    anchorDate.setHours(0, 0, 0, 0);
+    
+    const timeDiff = currentStartDate.getTime() - anchorDate.getTime();
+    const daysDiff = Math.round(timeDiff / (1000 * 60 * 60 * 24));
+    const weeksDiff = Math.floor(daysDiff / 7);
+    
+    const rotationCycle = ((weeksDiff % 3) + 3) % 3;
+
     if (rotationCycle === 0) {
+      if (runningShift === 'A') return 'A';
+      if (runningShift === 'B') return 'B';
+      if (runningShift === 'C') return 'C';
+    } else if (rotationCycle === 1) {
       if (runningShift === 'C') return 'A';
       if (runningShift === 'A') return 'B';
       if (runningShift === 'B') return 'C';
-    } else if (rotationCycle === 1) {
+    } else { // 2
       if (runningShift === 'B') return 'A';
       if (runningShift === 'C') return 'B';
       if (runningShift === 'A') return 'C';
-    } else { // 2
-      return runningShift;
     }
+    return runningShift;
   };
 
   const shiftsToRender: ShiftType[] = ['A', 'B', 'C', 'General', 'Leave'];
@@ -83,7 +99,7 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
         <h1 className="text-2xl font-bold text-slate-900 mb-2">সাপ্তাহিক ডিউটি রোস্টার</h1>
         <p className="text-lg text-slate-700">
           সপ্তাহ: <span className="font-bold">{weekNumber}</span> | 
-          তারিখ: <span className="font-bold">{formatDisplayDate(startDate)}</span> হতে <span className="font-bold">{formatDisplayDate(getEndDate(startDate))}</span>
+          তারিখ: <span className="font-bold">{formatDisplayDate(startDate)}</span> হতে <span className="font-bold">{formatDisplayDate(endDate)}</span>
         </p>
       </div>
 
@@ -97,7 +113,7 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
               <div className="flex items-center gap-3">
                 {['A', 'B', 'C'].includes(shift) ? (
                   <h2 className="text-lg font-bold">
-                    Permanent Shift: {getPermanentGroupForRunningShift(shift, weekNumber)} / Running Shift: {shiftDetails[shift].title} ({shiftDetails[shift].time})
+                    Permanent Shift: {getPermanentGroupForRunningShift(shift, startDate)} / Running Shift: {shiftDetails[shift].title} ({shiftDetails[shift].time})
                   </h2>
                 ) : (
                   <h2 className="text-lg font-bold">

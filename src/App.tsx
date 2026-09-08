@@ -10,7 +10,7 @@ import { LeaveOTManager } from './components/LeaveOTManager';
 import { RelieverManager } from './components/RelieverManager';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminSettingsModal } from './components/AdminSettingsModal';
-import { parseLocalDate, formatDate, getEndDate, formatDisplayDate } from './utils/dateUtils';
+import { parseLocalDate, formatDate, formatDisplayDate, getWeekDateRange } from './utils/dateUtils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'roster' | 'staff' | 'posts' | 'leave_ot'>('dashboard');
@@ -21,24 +21,14 @@ export default function App() {
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
 
-  const [startDate, setStartDate] = useState<string>(() => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = (day === 6) ? 0 : (day + 1);
-    d.setDate(d.getDate() - diff);
-    return formatDate(d);
-  });
+  // Derive start and end date purely from weekNumber
+  const currentWeekRange = useMemo(() => {
+    // getWeekDateRange returns { start, end } based on our new logic
+    return getWeekDateRange(weekNumber);
+  }, [weekNumber]);
   
-  const prevWeekRef = useRef(weekNumber);
-  useEffect(() => {
-    if (weekNumber !== prevWeekRef.current) {
-      const diffWeeks = weekNumber - prevWeekRef.current;
-      const d = parseLocalDate(startDate);
-      d.setDate(d.getDate() + diffWeeks * 7);
-      setStartDate(formatDate(d));
-      prevWeekRef.current = weekNumber;
-    }
-  }, [weekNumber, startDate]);
+  const startDate = currentWeekRange.start;
+  const endDate = currentWeekRange.end;
   
   const { staff, setStaff, posts, setPosts, leaves, setLeaves, ots, setOts, shiftChanges, setShiftChanges, isLoaded, saveData, isSaving, saveMessage } = useAppState();
 
@@ -241,36 +231,31 @@ export default function App() {
               
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg border border-slate-200">
-                  <label htmlFor="weekSelect" className="text-sm font-medium text-slate-700">সপ্তাহ:</label>
+                  <label htmlFor="weekSelect" className="text-sm font-medium text-slate-700">সপ্তাহ নির্বাচন:</label>
                   <select 
                     id="weekSelect"
                     className="bg-transparent border-none text-sm font-bold text-indigo-700 focus:ring-0 cursor-pointer p-0 pr-6"
                     value={weekNumber}
                     onChange={(e) => setWeekNumber(Number(e.target.value))}
                   >
-                    {[1, 2, 3, 4, 5, 6].map(w => (
-                      <option key={w} value={w}>{w}</option>
-                    ))}
+                    {Array.from({length: 30}).map((_, i) => {
+                      const w = i + 1;
+                      const { start } = getWeekDateRange(w);
+                      const d = parseLocalDate(start);
+                      const monthName = d.toLocaleString('bn-BD', { month: 'long', year: 'numeric' });
+                      return <option key={w} value={w}>সপ্তাহ {w} ({monthName})</option>
+                    })}
                   </select>
                 </div>
                 
                 <div className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg border border-slate-200">
-                  <label htmlFor="startDate" className="text-sm font-medium text-slate-700">শুরুর তারিখ (শনিবার):</label>
-                  <div className="relative flex items-center">
-                    <span className="text-sm font-bold text-indigo-700 pointer-events-none">
-                      {formatDisplayDate(startDate)}
-                    </span>
-                    <input
-                      type="date"
-                      id="startDate"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                    />
-                  </div>
+                  <span className="text-sm font-medium text-slate-700">তারিখ:</span>
+                  <span className="text-sm font-bold text-indigo-700">
+                    {formatDisplayDate(startDate)}
+                  </span>
                   <span className="text-sm text-slate-500">হতে</span>
                   <span className="text-sm font-bold text-indigo-700">
-                    {formatDisplayDate(getEndDate(startDate))}
+                    {formatDisplayDate(endDate)}
                   </span>
                 </div>
                 

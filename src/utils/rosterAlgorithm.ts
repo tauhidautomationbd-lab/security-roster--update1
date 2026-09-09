@@ -249,15 +249,47 @@ export const generateWeeklyRoster = (
             expectedRole = 'Officer';
         }
 
-        // Priority 1: Exact match by subSection for this staff, BUT MUST MATCH ROLE
-        staffIndex = availableStaff.findIndex(s => 
-            s.role === expectedRole && 
-            (s.subSection === req.name || s.subSection?.includes(req.name) || req.name.includes(s.subSection || '----'))
-        );
+        // Priority 1: Smart match by subSection for this staff, BUT MUST MATCH ROLE
+        staffIndex = availableStaff.findIndex(s => {
+            if (s.role !== expectedRole) return false;
+            if (!s.subSection) return false;
+            
+            const sub = s.subSection;
+            const reqN = req.name;
+            
+            if (sub === reqN || sub.includes(reqN) || reqN.includes(sub)) return true;
+            
+            const cleanSub = sub.toLowerCase()
+              .replace(/reliver|reliever/gi, '')
+              .replace(/shift\s*[-]?\s*[a-c]/gi, '')
+              .replace(/[\+\&\,]/g, ' ')
+              .trim();
+              
+            const cleanReq = reqN.toLowerCase();
+            
+            if (cleanSub.length > 3 && (cleanReq.includes(cleanSub) || cleanSub.includes(cleanReq))) return true;
+            
+            const sNums = (cleanSub.match(/\d+/g) || []).map(n => parseInt(n, 10));
+            const rNums = (cleanReq.match(/\d+/g) || []).map(n => parseInt(n, 10));
+            
+            if (sNums.length > 0 && rNums.length > 0 && (cleanReq.includes('post') || cleanSub.includes('post'))) {
+               if (sNums.some(n => rNums.includes(n))) return true;
+            }
+            
+            return false;
+        });
         
-        // Priority 2: Match by role if subSection match fails
+        // Priority 2: Match by role if subSection match fails (Only grab unassigned/reserve staff)
         if (staffIndex === -1) {
-            staffIndex = availableStaff.findIndex(s => s.role === expectedRole);
+            staffIndex = availableStaff.findIndex(s => {
+                if (s.role !== expectedRole) return false;
+                if (!s.subSection || s.subSection.trim() === '') return true;
+                const sub = s.subSection.toLowerCase();
+                // If they are explicitly reserve, extra, or a general reliever without a specific post
+                if (sub.includes('অতিরিক্ত') || sub.includes('reserve') || sub.includes('রিজার্ভ')) return true;
+                if ((sub.includes('reliever') || sub.includes('reliver')) && !sub.includes('post') && !sub.includes('gate')) return true;
+                return false;
+            });
         }
         
         if (staffIndex === -1) {
@@ -394,11 +426,15 @@ export const generateWeeklyRoster = (
                     let match;
                     while ((match = regex.exec(str)) !== null) {
                         const extracted = match[1].match(/\d+/g);
-                        if (extracted) nums.push(...extracted);
+                        if (extracted) {
+                           extracted.forEach(n => nums.push(parseInt(n, 10)));
+                        }
                     }
                     if (nums.length === 0) {
                         const allNums = str.match(/\d+/g);
-                        if (allNums && str.toLowerCase().includes('post')) nums.push(...allNums);
+                        if (allNums && str.toLowerCase().includes('post')) {
+                           allNums.forEach(n => nums.push(parseInt(n, 10)));
+                        }
                     }
                     return nums;
                 };

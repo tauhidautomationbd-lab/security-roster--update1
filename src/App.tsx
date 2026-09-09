@@ -1,36 +1,51 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { Calendar, Users, ClipboardList, Download, LayoutDashboard, Settings, Clock4, Save, Lock, LogOut, ShieldCheck, UserCheck, KeyRound } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { 
+  Calendar, Users, ClipboardList, Download, LayoutDashboard, Settings, 
+  Clock4, Save, Lock, LogOut, ShieldCheck, History, Wifi, WifiOff, User, UserPlus
+} from 'lucide-react';
 import { generateWeeklyRoster } from './utils/rosterAlgorithm';
 import { RosterTable } from './components/RosterTable';
 import { useAppState } from './hooks/useAppState';
+import { useAuth } from './hooks/useAuth';
 import { Dashboard } from './components/Dashboard';
 import { StaffManager } from './components/StaffManager';
 import { PostManager } from './components/PostManager';
 import { LeaveOTManager } from './components/LeaveOTManager';
 import { RelieverManager } from './components/RelieverManager';
-import { AdminLoginModal } from './components/AdminLoginModal';
-import { AdminSettingsModal } from './components/AdminSettingsModal';
-import { parseLocalDate, formatDate, formatDisplayDate, getWeekDateRange } from './utils/dateUtils';
+import { AuthModal } from './components/AuthModal';
+import { AuditLogView } from './components/AuditLogView';
+import { parseLocalDate, formatDisplayDate, getWeekDateRange } from './utils/dateUtils';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'roster' | 'staff' | 'posts' | 'leave_ot'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'roster' | 'staff' | 'posts' | 'leave_ot' | 'audit_logs'>('dashboard');
   const [weekNumber, setWeekNumber] = useState<number>(1);
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    return localStorage.getItem('security_roster_is_admin') === 'true';
-  });
-  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
-  const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+
+  const auth = useAuth();
+  const { currentUser, isAuthenticated, isAdmin, logout } = auth;
 
   // Derive start and end date purely from weekNumber
   const currentWeekRange = useMemo(() => {
-    // getWeekDateRange returns { start, end } based on our new logic
     return getWeekDateRange(weekNumber);
   }, [weekNumber]);
   
   const startDate = currentWeekRange.start;
   const endDate = currentWeekRange.end;
   
-  const { staff, setStaff, posts, setPosts, leaves, setLeaves, ots, setOts, shiftChanges, setShiftChanges, isLoaded, saveData, isSaving, saveMessage } = useAppState();
+  const { 
+    staff, setStaff, 
+    posts, setPosts, 
+    leaves, setLeaves, 
+    ots, setOts, 
+    shiftChanges, setShiftChanges, 
+    isLoaded, 
+    saveData, 
+    isSaving, 
+    saveMessage,
+    lastSavedAt,
+    lastSavedBy,
+    isCloudSynced 
+  } = useAppState();
 
   const roster = useMemo(() => {
     return generateWeeklyRoster(weekNumber, startDate, staff, posts, leaves, ots, shiftChanges);
@@ -38,99 +53,118 @@ export default function App() {
 
   // Handle logout
   const handleLogout = () => {
-    localStorage.removeItem('security_roster_is_admin');
-    setIsAdmin(false);
-    if (['staff', 'posts', 'leave_ot'].includes(activeTab)) {
+    logout();
+    if (['staff', 'posts', 'leave_ot', 'audit_logs'].includes(activeTab)) {
       setActiveTab('dashboard');
     }
   };
 
-  // Filter navigation items based on admin status
+  // Filter navigation items based on auth status
   const navItems = useMemo(() => {
     const publicItems = [
       { id: 'dashboard', label: 'ড্যাশবোর্ড', icon: LayoutDashboard },
       { id: 'roster', label: 'সাপ্তাহিক রোস্টার', icon: ClipboardList },
     ] as const;
 
-    const adminOnlyItems = [
+    const authorizedItems = [
       { id: 'staff', label: 'স্টাফ ম্যানেজমেন্ট', icon: Users },
       { id: 'posts', label: 'পোস্ট ম্যানেজমেন্ট', icon: Settings },
       { id: 'leave_ot', label: 'ছুটি ও ওভারটাইম', icon: Clock4 },
+      { id: 'audit_logs', label: 'অ্যাক্টিভিটি লগ', icon: History },
     ] as const;
 
-    if (isAdmin) {
-      return [...publicItems, ...adminOnlyItems];
+    if (isAuthenticated) {
+      return [...publicItems, ...authorizedItems];
     }
     return publicItems;
-  }, [isAdmin]);
+  }, [isAuthenticated]);
+
+  const handleSave = () => {
+    saveData(currentUser);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col relative">
+      {/* Toast Save Notifications */}
       {saveMessage === 'success' && (
-        <div className="fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-lg font-medium z-50 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4">
-          <Save className="w-5 h-5" />
-          সকল পরিবর্তন সফলভাবে সেভ হয়েছে!
+        <div className="fixed bottom-5 right-5 bg-emerald-700 text-white px-5 py-3.5 rounded-xl shadow-2xl font-medium z-50 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 border border-emerald-500">
+          <Save className="w-5 h-5 text-emerald-200" />
+          <div>
+            <p className="font-bold text-sm">সকল পরিবর্তন সফলভাবে ক্লাউডে সেভ হয়েছে!</p>
+            <p className="text-[11px] text-emerald-100">রিলোড করলেও তথ্য অপরিবর্তিত থাকবে ও অন্য কম্পিউটারেও আপডেট হবে।</p>
+          </div>
         </div>
       )}
       {saveMessage === 'error' && (
-        <div className="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-3 rounded-lg shadow-lg font-medium z-50 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-5 right-5 bg-rose-700 text-white px-5 py-3.5 rounded-xl shadow-2xl font-medium z-50 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 border border-rose-500">
           <span className="text-xl">⚠️</span>
-          সেভ করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।
+          <div>
+            <p className="font-bold text-sm">সেভ করতে সমস্যা হয়েছে</p>
+            <p className="text-[11px] text-rose-100">দয়া করে ইন্টারনেট সংযোগ চেক করে পুনরায় সেভ করুন।</p>
+          </div>
         </div>
       )}
 
       {/* Main Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center py-3 md:py-0 md:h-16 gap-3">
-            {/* Logo and Status Badge */}
+            
+            {/* Logo and Cloud Status Badge */}
             <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
               <div className="flex items-center gap-2.5">
-                <div className={`p-2 rounded-lg text-white ${isAdmin ? 'bg-indigo-600' : 'bg-slate-700'}`}>
+                <div className={`p-2 rounded-xl text-white ${isAuthenticated ? 'bg-indigo-600' : 'bg-slate-700'} shadow-xs`}>
                   <Calendar className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h1 className="text-lg font-bold text-slate-800 leading-tight">সিকিউরিটি রোস্টার প্রো</h1>
-                    {isAdmin ? (
-                      <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[11px] font-bold rounded-full border border-amber-300 flex items-center gap-1">
-                        <ShieldCheck className="w-3 h-3 text-amber-600" /> অ্যাডমিন মোড
+                    <h1 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
+                      সিকিউরিটি রোস্টার প্রো
+                    </h1>
+                    {isCloudSynced ? (
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 flex items-center gap-1" title="ক্লাউডের সাথে রিয়েল-টাইমে সংযুক্ত">
+                        <Wifi className="w-3 h-3 text-emerald-600" /> লাইভ সিঙ্কড
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[11px] font-medium rounded-full border border-slate-200">
-                        সাধারণ ভিউ
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-medium rounded-full border border-slate-200 flex items-center gap-1">
+                        <WifiOff className="w-3 h-3 text-slate-400" /> অফলাইন ক্যাশ
                       </span>
                     )}
                   </div>
+                  {lastSavedAt && (
+                    <p className="text-[10px] text-slate-500 leading-none mt-0.5">
+                      সর্বশেষ সেভ: {new Date(lastSavedAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}
+                      {lastSavedBy ? ` (${lastSavedBy})` : ''}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Mobile Save Button if Admin */}
-              {isAdmin && (
-                <button 
-                  onClick={saveData}
-                  disabled={isSaving || !isLoaded}
-                  className="md:hidden bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  {isSaving ? 'সেভ হচ্ছে...' : 'সেভ'}
-                </button>
-              )}
-
-              {/* Mobile Admin Login Button if Not Logged In */}
-              {!isAdmin && (
-                <button 
-                  onClick={() => setShowLoginModal(true)}
-                  className="md:hidden flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm"
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  লগইন
-                </button>
-              )}
+              {/* Mobile Controls */}
+              <div className="flex items-center gap-2 md:hidden">
+                {isAuthenticated ? (
+                  <button 
+                    onClick={handleSave}
+                    disabled={isSaving || !isLoaded}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    {isSaving ? 'সেভ হচ্ছে...' : 'সেভ'}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => setShowAuthModal(true)}
+                    className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    লগইন
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Navigation and Actions */}
-            <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+            <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
               <nav className="flex space-x-1 overflow-x-auto w-full md:w-auto flex-1">
                 {navItems.map(item => (
                   <button
@@ -148,12 +182,12 @@ export default function App() {
                 ))}
               </nav>
 
-              {/* Admin vs Public Action Controls */}
+              {/* User Account and Save Controls */}
               <div className="flex items-center gap-2 shrink-0">
-                {isAdmin ? (
+                {isAuthenticated ? (
                   <>
                     <button 
-                      onClick={saveData}
+                      onClick={handleSave}
                       disabled={isSaving || !isLoaded}
                       className="hidden md:flex bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm disabled:opacity-50 items-center gap-1.5 whitespace-nowrap"
                     >
@@ -161,30 +195,37 @@ export default function App() {
                       {isSaving ? 'সেভ হচ্ছে...' : 'সকল পরিবর্তন সেভ করুন'}
                     </button>
 
-                    <button
-                      onClick={() => setShowSettingsModal(true)}
-                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
-                      title="অ্যাডমিন ক্রেডেনশিয়াল সেটিংস"
-                    >
-                      <KeyRound className="w-4 h-4" />
-                    </button>
+                    {/* Current User Pill */}
+                    <div className="hidden lg:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                      <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                        {currentUser?.name?.charAt(0) || 'U'}
+                      </div>
+                      <div className="text-left">
+                        <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[120px]">
+                          {currentUser?.name}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-medium leading-none">
+                          {currentUser?.role}
+                        </p>
+                      </div>
+                    </div>
 
                     <button
                       onClick={handleLogout}
-                      className="flex items-center gap-1.5 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-slate-200 hover:border-rose-200 whitespace-nowrap"
-                      title="অ্যাডমিন প্যানেল থেকে লগআউট করুন"
+                      className="flex items-center gap-1 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 px-2.5 py-2 rounded-lg text-xs font-semibold transition-colors border border-slate-200 hover:border-rose-200 whitespace-nowrap"
+                      title="লগআউট করুন"
                     >
-                      <LogOut className="w-4 h-4" />
-                      <span>লগআউট</span>
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">লগআউট</span>
                     </button>
                   </>
                 ) : (
                   <button 
-                    onClick={() => setShowLoginModal(true)}
+                    onClick={() => setShowAuthModal(true)}
                     className="hidden md:flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap"
                   >
                     <Lock className="w-4 h-4" />
-                    <span>অ্যাডমিন লগইন</span>
+                    <span>লগইন / সাইনআপ</span>
                   </button>
                 )}
               </div>
@@ -193,17 +234,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* Admin Login Modal */}
-      <AdminLoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onLoginSuccess={() => setIsAdmin(true)}
-      />
-
-      {/* Admin Settings Modal */}
-      <AdminSettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
+      {/* Auth Modal (Login / Signup) */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        auth={auth}
       />
 
       {/* Main Tab Content */}
@@ -274,16 +309,25 @@ export default function App() {
           </div>
         )}
 
-        {/* Admin Guarded Tabs */}
-        {isAdmin && activeTab === 'staff' && (
-          <StaffManager staff={staff} setStaff={setStaff} posts={posts} />
+        {/* Authenticated Tabs */}
+        {isAuthenticated && activeTab === 'staff' && (
+          <StaffManager 
+            staff={staff} 
+            setStaff={setStaff} 
+            posts={posts} 
+            currentUser={currentUser} 
+          />
         )}
         
-        {isAdmin && activeTab === 'posts' && (
-          <PostManager posts={posts} setPosts={setPosts} staff={staff} />
+        {isAuthenticated && activeTab === 'posts' && (
+          <PostManager 
+            posts={posts} 
+            setPosts={setPosts} 
+            staff={staff} 
+          />
         )}
         
-        {isAdmin && activeTab === 'leave_ot' && (
+        {isAuthenticated && activeTab === 'leave_ot' && (
           <LeaveOTManager 
             staff={staff} 
             posts={posts} 
@@ -294,6 +338,10 @@ export default function App() {
             shiftChanges={shiftChanges} 
             setShiftChanges={setShiftChanges} 
           />
+        )}
+
+        {isAuthenticated && activeTab === 'audit_logs' && (
+          <AuditLogView />
         )}
       </main>
     </div>

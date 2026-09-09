@@ -3,12 +3,13 @@ import { Staff, ShiftType, PostRequirement, RosterAssignment, PermanentGroup, Le
 export const generateWeeklyRoster = (
   weekNumber: number,
   startDate: string,
-  allStaff: Staff[],
+  rawStaff: Staff[],
   postRequirements: PostRequirement[],
   leaves: LeaveRecord[],
   ots: OTRecord[],
   shiftChanges: ShiftChangeRecord[] = []
 ): RosterAssignment[] => {
+  const allStaff = rawStaff.filter(s => s.status !== 'resigned');
   const roster: RosterAssignment[] = [];
   const weekLeaves = leaves.filter(l => l.weekNumber === weekNumber);
   const weekOts = ots.filter(o => o.weekNumber === weekNumber);

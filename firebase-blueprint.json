@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "RosterState": {
+      "title": "RosterState",
+      "description": "Shared application state containing staff, posts, leaves, overtime, and shift changes.",
+      "type": "object",
+      "properties": {
+        "staff": {
+          "type": "array",
+          "description": "List of security staff members"
+        },
+        "posts": {
+          "type": "array",
+          "description": "List of post requirements"
+        },
+        "leaves": {
+          "type": "array",
+          "description": "List of approved leaves"
+        },
+        "ots": {
+          "type": "array",
+          "description": "List of active overtime duties"
+        },
+        "shiftChanges": {
+          "type": "array",
+          "description": "List of shift change swaps"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last save"
+        },
+        "lastSavedBy": {
+          "type": "string",
+          "description": "Name or ID of user who made the last change"
+        }
+      },
+      "required": ["staff", "posts", "leaves", "ots", "shiftChanges", "updatedAt"]
+    },
+    "AppUser": {
+      "title": "AppUser",
+      "description": "System user account for multi-computer login",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "name": { "type": "string" },
+        "mobile": { "type": "string" },
+        "role": { "type": "string" },
+        "password": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["username", "name", "password", "role", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Audit record of changes made by users",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["timestamp", "userId", "userName", "action"]
+    }
+  },
+  "firestore": {
+    "/shared_roster/state": {
+      "schema": "RosterState",
+      "description": "Shared roster state"
+    },
+    "/users/{userId}": {
+      "schema": "AppUser",
+      "description": "Registered users"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "User activity and change audit logs"
+    }
+  }
+}

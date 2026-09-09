@@ -9,6 +9,29 @@ export interface Staff {
   permanentGroup: PermanentGroup;
   offDay?: string;
   subSection?: string;
+  status?: 'active' | 'resigned';
+  resignationDate?: string;
+  resignationReason?: string;
+  resignationRemarks?: string;
+}
+
+export interface AppUser {
+  id: string;
+  name: string;
+  mobile?: string;
+  role: 'Admin' | 'Supervisor' | 'Officer' | 'Operator';
+  password?: string;
+  createdAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  details?: string;
 }
 
 export interface PostRequirement {

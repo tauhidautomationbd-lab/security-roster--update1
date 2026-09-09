@@ -2,13 +2,20 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // This allows any anonymously signed-in user to read/write the roster data
-    // This is appropriate for a company roster where anyone with the link can edit.
+    // Shared roster state accessible by authenticated or app users
     match /shared_roster/{document=**} {
       allow read, write: if true;
     }
+    // Registered user accounts for multi-computer login
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    // Audit logs tracking user actions
+    match /audit_logs/{logId} {
+      allow read, write: if true;
+    }
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }

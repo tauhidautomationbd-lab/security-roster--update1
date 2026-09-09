@@ -63,7 +63,7 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
   const getPermanentGroupForRunningShift = (runningShift: ShiftType, startDate: string) => {
     const [y, m, d] = startDate.split('-').map(Number);
     const currentStartDate = new Date(y, m - 1, d);
-    const anchorDate = new Date(2026, 8, 5); // 2026-09-05 (Saturday)
+    const anchorDate = new Date(2026, 7, 29); // 2026-08-29 (Saturday)
     
     currentStartDate.setHours(0, 0, 0, 0);
     anchorDate.setHours(0, 0, 0, 0);
@@ -79,13 +79,13 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
       if (runningShift === 'B') return 'B';
       if (runningShift === 'C') return 'C';
     } else if (rotationCycle === 1) {
-      if (runningShift === 'C') return 'A';
-      if (runningShift === 'A') return 'B';
-      if (runningShift === 'B') return 'C';
-    } else { // 2
+      if (runningShift === 'A') return 'C';
       if (runningShift === 'B') return 'A';
       if (runningShift === 'C') return 'B';
-      if (runningShift === 'A') return 'C';
+    } else { // 2
+      if (runningShift === 'A') return 'B';
+      if (runningShift === 'B') return 'C';
+      if (runningShift === 'C') return 'A';
     }
     return runningShift;
   };

@@ -17,7 +17,7 @@ export const generateWeeklyRoster = (
   
   const [y, m, d] = startDate.split('-').map(Number);
   const currentStartDate = new Date(y, m - 1, d);
-  const anchorDate = new Date(2026, 8, 5); // 2026-09-05 (Saturday)
+  const anchorDate = new Date(2026, 7, 29); // 2026-08-29 (Saturday)
   
   // Set hours to 0 to avoid DST shifting issues
   currentStartDate.setHours(0, 0, 0, 0);
@@ -38,13 +38,13 @@ export const generateWeeklyRoster = (
       if (permanentGroup === 'B') return 'B';
       if (permanentGroup === 'C') return 'C';
     } else if (rotationCycle === 1) {
-      if (permanentGroup === 'A') return 'C';
-      if (permanentGroup === 'B') return 'A';
-      if (permanentGroup === 'C') return 'B';
-    } else { // 2
       if (permanentGroup === 'A') return 'B';
       if (permanentGroup === 'B') return 'C';
       if (permanentGroup === 'C') return 'A';
+    } else { // 2
+      if (permanentGroup === 'A') return 'C';
+      if (permanentGroup === 'B') return 'A';
+      if (permanentGroup === 'C') return 'B';
     }
     return 'General';
   };

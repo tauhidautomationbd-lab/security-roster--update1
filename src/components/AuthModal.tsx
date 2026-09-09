@@ -81,7 +81,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setTimeout(() => {
         onClose();
         setSuccess('');
-      }, 1000);
+        setActiveTab('login');
+      }, 3500);
     } else {
       setError(res.message);
     }

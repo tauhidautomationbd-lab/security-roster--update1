@@ -19,7 +19,8 @@ export interface AppUser {
   id: string;
   name: string;
   mobile?: string;
-  role: 'Admin' | 'Supervisor' | 'Officer' | 'Operator';
+  role: 'Super Admin' | 'Admin' | 'Supervisor' | 'Officer' | 'Operator';
+  status?: 'pending' | 'approved' | 'rejected';
   password?: string;
   createdAt: string;
 }

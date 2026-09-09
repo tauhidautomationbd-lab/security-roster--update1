@@ -31,7 +31,16 @@ export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, 
   const reqA = posts.reduce((sum, p) => sum + (p.shiftCounts.A || 0), 0);
   const reqB = posts.reduce((sum, p) => sum + (p.shiftCounts.B || 0), 0);
   const reqC = posts.reduce((sum, p) => sum + (p.shiftCounts.C || 0), 0);
-  
+  const reqGeneral = posts.reduce((sum, p) => sum + (p.shiftCounts.General || 0), 0);
+  const reqReliever = posts.reduce((sum, p) => sum + (p.shiftCounts.Reliever || 0), 0);
+
+  // Total Manpower Calculation
+  const totalRequiredManpower = reqA + reqB + reqC + reqGeneral + reqReliever;
+  const manpowerGap = totalActiveStaff - totalRequiredManpower;
+  const isShortage = manpowerGap < 0;
+  const isExcess = manpowerGap > 0;
+  const isBalanced = manpowerGap === 0;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -41,8 +50,8 @@ export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, 
         </div>
       </div>
       
-      {/* Top 4 Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Top Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Active Staff */}
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
           <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
@@ -52,6 +61,22 @@ export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, 
             <p className="text-xs font-semibold text-slate-500">মোট সক্রিয় লোকবল</p>
             <p className="text-2xl font-bold text-slate-800">{totalActiveStaff} জন</p>
             <span className="text-[11px] text-slate-400">কাজে নিয়োজিত</span>
+          </div>
+        </div>
+        
+        {/* Manpower Gap / Shortage */}
+        <div className={`bg-white p-5 rounded-xl shadow-sm border flex items-center gap-4 ${isShortage ? 'border-rose-300' : isExcess ? 'border-emerald-300' : 'border-slate-200'}`}>
+          <div className={`p-3 rounded-xl ${isShortage ? 'bg-rose-100 text-rose-600' : isExcess ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-500">লোকবল পরিস্থিতি</p>
+            <p className={`text-xl font-bold ${isShortage ? 'text-rose-700' : isExcess ? 'text-emerald-700' : 'text-slate-800'}`}>
+              {isShortage ? `${Math.abs(manpowerGap)} জন শর্ট` : isExcess ? `${manpowerGap} জন বেশি` : 'পর্যাপ্ত'}
+            </p>
+            <span className={`text-[10px] font-medium ${isShortage ? 'text-rose-500' : isExcess ? 'text-emerald-500' : 'text-slate-400'}`}>
+              চাহিদা: {totalRequiredManpower} জন
+            </span>
           </div>
         </div>
         
@@ -73,7 +98,7 @@ export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, 
             <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500">ওভারটাইম ডিমান্ড</p>
+            <p className="text-xs font-semibold text-slate-500">ওভারটাইম</p>
             <p className="text-2xl font-bold text-slate-800">{activeOTs} টি</p>
             <span className="text-[11px] text-slate-400">চলতি সপ্তাহে</span>
           </div>
@@ -85,7 +110,7 @@ export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, 
             <UserX className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500">চাকরি ছেড়েছেন (রিজাইনড)</p>
+            <p className="text-xs font-semibold text-slate-500">চাকরি ছেড়েছেন</p>
             <p className="text-2xl font-bold text-rose-700">{totalResignedStaff} জন</p>
             <span className="text-[11px] text-rose-500 font-medium">পদত্যাগকারী স্টাফ</span>
           </div>
@@ -177,10 +202,10 @@ export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, 
                   <th className="px-4 py-2.5">স্টাফ আইডি</th>
                   <th className="px-4 py-2.5">নাম</th>
                   <th className="px-4 py-2.5">পদবী</th>
+                  <th className="px-4 py-2.5">পোস্ট ও শিফট</th>
                   <th className="px-4 py-2.5">পদত্যাগের তারিখ</th>
                   <th className="px-4 py-2.5">পদত্যাগের কারণ</th>
                   <th className="px-4 py-2.5">মন্তব্য / বিবরণ</th>
-                  <th className="px-4 py-2.5 text-center">স্ট্যাটাস</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -192,6 +217,12 @@ export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, 
                     <td className="px-4 py-2.5 text-slate-600">
                       {s.role === 'Guard' ? 'সিকিউরিটি গার্ড' : s.role === 'LadyGuard' ? 'লেডি গার্ড' : s.role === 'Supervisor' ? 'সুপারভাইজর' : 'অফিসার'}
                     </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex flex-col">
+                        <span className="text-slate-800 font-medium text-xs">{s.subSection || 'পোস্ট নির্ধারিত নেই'}</span>
+                        <span className="text-slate-500 text-[11px]">শিফট: {s.permanentGroup || 'N/A'}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-2.5 text-slate-700 font-medium whitespace-nowrap">
                       {s.resignationDate ? formatDisplayDate(s.resignationDate) : '-'}
                     </td>
@@ -200,11 +231,6 @@ export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, 
                     </td>
                     <td className="px-4 py-2.5 text-slate-500 text-xs">
                       {s.resignationRemarks || '-'}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800">
-                        চাকরি স্থগিত
-                      </span>
                     </td>
                   </tr>
                 ))}

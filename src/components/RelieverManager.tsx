@@ -56,8 +56,9 @@ export const RelieverManager: React.FC<Props> = ({ staff, posts, shiftChanges, w
     }
     return 'General';
   };
-const assignmentsByDay = useMemo(() => {
+const { assignmentsByDay, unassignedByDay } = useMemo(() => {
     const assignments = new Map<string, Map<string, Staff[]>>();
+    const unassigned = new Map<string, Staff[]>();
 
     const extractPostNumbers = (str: string): number[] => {
        const nums: number[] = [];
@@ -138,7 +139,7 @@ const assignmentsByDay = useMemo(() => {
                       if (sTags.some(tag => rTags.includes(tag))) matches = true;
                   }
                   
-                  if (!matches && sTags.length === 0 && rTags.length === 0) {
+                  if (!matches) {
                       if (rSub && sSub && (rSub.includes(sSub) || sSub.includes(rSub)) && sSub.length > 3) matches = true;
                   }
                   
@@ -165,9 +166,10 @@ const assignmentsByDay = useMemo(() => {
           }
           dayAssignments.set(r.id, covered);
       });
+      unassigned.set(day, [...unassignedOffStaff]);
       assignments.set(day, dayAssignments);
     });
-return assignments;
+    return { assignmentsByDay: assignments, unassignedByDay: unassigned };
   }, [staff, relievers, days, changedShiftMap, posts]);
 
   return (
@@ -224,6 +226,50 @@ return assignments;
                     })}
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Unassigned Off-day Staff (Pending Relievers) */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold text-slate-800">অনির্ধারিত অফ-ডে (Unassigned Off-Days)</h2>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3 w-32">দিন (Day)</th>
+                  <th className="px-4 py-3">যাদের রিলিভার প্রয়োজন (Staff missing relievers)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {days.map(day => {
+                  const unassigned = unassignedByDay.get(day) || [];
+                  if (unassigned.length === 0) return null;
+                  return (
+                    <tr key={day} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-medium text-slate-800">{day}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {unassigned.map(s => (
+                            <span key={s.id} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-100">
+                              {s.name} ({s.id}) - {s.subSection || 'Unknown'}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {days.every(day => (unassignedByDay.get(day) || []).length === 0) && (
+                  <tr>
+                    <td colSpan={2} className="px-4 py-6 text-center text-slate-500 font-medium">
+                      সব অফ-ডে স্টাফের রিলিভার নির্ধারিত হয়েছে। (All off-days covered!)
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

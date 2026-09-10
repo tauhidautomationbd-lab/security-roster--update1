@@ -59,21 +59,20 @@ export const RelieverManager: React.FC<Props> = ({ staff, posts, shiftChanges, w
 const assignmentsByDay = useMemo(() => {
     const assignments = new Map<string, Map<string, Staff[]>>();
 
-    const extractPostNumbers = (str: string): string[] => {
-       const nums: string[] = [];
+    const extractPostNumbers = (str: string): number[] => {
+       const nums: number[] = [];
        const regex = /(?:post|rg)[-\s]*([\d\s,&and]+)/gi;
        let match;
        while ((match = regex.exec(str)) !== null) {
            const extracted = match[1].match(/\d+/g);
            if (extracted) {
-               const prefix = match[0].toLowerCase().includes('rg') ? 'rg' : 'post';
-               nums.push(...extracted.map(n => prefix + '-' + parseInt(n, 10).toString()));
+               extracted.forEach(n => nums.push(parseInt(n, 10)));
            }
        }
        if (nums.length === 0) {
            const allNums = str.match(/\d+/g);
            if (allNums && str.toLowerCase().includes('post')) {
-               nums.push(...allNums.map(n => 'post-' + parseInt(n, 10).toString()));
+               allNums.forEach(n => nums.push(parseInt(n, 10)));
            }
        }
        return nums;
@@ -196,9 +195,9 @@ return assignments;
                     {days.map(day => {
                       const offStaff = assignmentsByDay.get(day)?.get(r.id) || [];
                       
-                      let elements: React.ReactNode = <span className="text-slate-400">-</span>;
+                      let elements: React.ReactNode;
                       if (String(r.offDay || '').trim().toLowerCase() === day.toLowerCase()) {
-                        elements = <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">অফ ডে</span>;
+                        elements = <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 whitespace-nowrap">অফ ডে</span>;
                       } else if (offStaff.length > 0) {
                         elements = (
                           <div className="flex flex-col gap-1">
@@ -208,6 +207,12 @@ return assignments;
                               </span>
                             ))}
                           </div>
+                        );
+                      } else {
+                        elements = (
+                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-50 text-emerald-700 text-left border border-emerald-100">
+                             নির্ধারিত ডিউটি
+                           </span>
                         );
                       }
                       

@@ -88,12 +88,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleQuickFill = () => {
-    setLoginId('admin');
-    setLoginPassword('admin123');
-    setError('');
-  };
-
   return (
     <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
       <div className="bg-white rounded-2xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 relative max-h-[90vh] overflow-y-auto">
@@ -225,26 +219,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </>
               )}
             </button>
-
-            {/* Quick Fill Box */}
-            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  ডিফল্ট অ্যাডমিন তথ্য:
-                </span>
-                <button
-                  type="button"
-                  onClick={handleQuickFill}
-                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
-                >
-                  স্বয়ংক্রিয় পূরণ
-                </button>
-              </div>
-              <div className="mt-1.5 font-mono text-[11px] text-slate-700">
-                আইডি: <strong className="text-slate-900">admin</strong> | পাসওয়ার্ড: <strong className="text-slate-900">admin123</strong>
-              </div>
-            </div>
           </form>
         )}
 

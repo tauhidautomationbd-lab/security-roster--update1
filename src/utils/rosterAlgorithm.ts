@@ -243,7 +243,7 @@ export const generateWeeklyRoster = (
         const reqNameLower = req.name.toLowerCase();
         if (req.id === 'lg' || reqNameLower.includes('লেডি') || reqNameLower.includes('lady') || reqNameLower.includes('female')) {
             expectedRole = 'LadyGuard';
-        } else if (req.id === '16' || req.id === 'sup' || req.id === 'dev' || reqNameLower.includes('সুপারভাইজর') || reqNameLower.includes('supervisor') || reqNameLower.includes('device') || reqNameLower.includes('checker')) {
+        } else if (req.id === '16' || req.id === 'sup' || reqNameLower.includes('সুপারভাইজর') || reqNameLower.includes('supervisor')) {
             expectedRole = 'Supervisor';
         } else if (req.id === 'officer' || reqNameLower.includes('officer')) {
             expectedRole = 'Officer';

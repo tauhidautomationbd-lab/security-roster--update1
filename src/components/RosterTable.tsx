@@ -90,7 +90,7 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
     return runningShift;
   };
 
-  const shiftsToRender: ShiftType[] = ['A', 'B', 'C', 'General', 'Leave'];
+  const shiftsToRender: ShiftType[] = ['A', 'B', 'C', 'General', 'Reliever', 'Leave'];
 
   return (
     <div className="space-y-8">

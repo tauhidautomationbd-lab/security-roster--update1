@@ -7,9 +7,10 @@ interface Props {
   posts: PostRequirement[];
   shiftChanges: ShiftChangeRecord[];
   weekNumber: number;
+  startDate: string;
 }
 
-export const RelieverManager: React.FC<Props> = ({ staff, posts, shiftChanges, weekNumber }) => {
+export const RelieverManager: React.FC<Props> = ({ staff, posts, shiftChanges, weekNumber, startDate }) => {
   const weekShiftChanges = shiftChanges.filter(sc => sc.weekNumber === weekNumber);
   
   const changedShiftMap = new Map<string, string>();
@@ -37,22 +38,35 @@ export const RelieverManager: React.FC<Props> = ({ staff, posts, shiftChanges, w
   const supportPersons = uniqueSupportPersonIds.map(id => staff.find(s => s.id === id)).filter(Boolean) as Staff[];
 
   
-  const rotationCycle = weekNumber % 3;
+  const [y, m, d] = startDate.split('-').map(Number);
+  const currentStartDate = new Date(y, m - 1, d);
+  const anchorDate = new Date(2026, 7, 29); // 2026-08-29 (Saturday)
+  
+  currentStartDate.setHours(0, 0, 0, 0);
+  anchorDate.setHours(0, 0, 0, 0);
+  
+  const timeDiff = currentStartDate.getTime() - anchorDate.getTime();
+  const daysDiff = Math.round(timeDiff / (1000 * 60 * 60 * 24));
+  const weeksDiff = Math.floor(daysDiff / 7);
+  
+  const rotationCycle = ((weeksDiff % 3) + 3) % 3;
+
   const getAssignedShift = (permanentGroup: string): string => {
     if (permanentGroup === 'General') return 'General';
     if (permanentGroup === 'Reliever') return 'Reliever';
+    
     if (rotationCycle === 0) {
-      if (permanentGroup === 'A') return 'C';
-      if (permanentGroup === 'B') return 'A';
-      if (permanentGroup === 'C') return 'B';
-    } else if (rotationCycle === 1) {
       if (permanentGroup === 'A') return 'B';
       if (permanentGroup === 'B') return 'C';
       if (permanentGroup === 'C') return 'A';
-    } else {
+    } else if (rotationCycle === 1) {
       if (permanentGroup === 'A') return 'A';
       if (permanentGroup === 'B') return 'B';
       if (permanentGroup === 'C') return 'C';
+    } else { // 2
+      if (permanentGroup === 'A') return 'C';
+      if (permanentGroup === 'B') return 'A';
+      if (permanentGroup === 'C') return 'B';
     }
     return 'General';
   };

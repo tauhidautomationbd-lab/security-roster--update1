@@ -75,17 +75,17 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
     const rotationCycle = ((weeksDiff % 3) + 3) % 3;
 
     if (rotationCycle === 0) {
+      if (runningShift === 'B') return 'A';
+      if (runningShift === 'C') return 'B';
+      if (runningShift === 'A') return 'C';
+    } else if (rotationCycle === 1) {
       if (runningShift === 'A') return 'A';
       if (runningShift === 'B') return 'B';
       if (runningShift === 'C') return 'C';
-    } else if (rotationCycle === 1) {
-      if (runningShift === 'A') return 'C';
-      if (runningShift === 'B') return 'A';
-      if (runningShift === 'C') return 'B';
     } else { // 2
+      if (runningShift === 'C') return 'A';
       if (runningShift === 'A') return 'B';
       if (runningShift === 'B') return 'C';
-      if (runningShift === 'C') return 'A';
     }
     return runningShift;
   };

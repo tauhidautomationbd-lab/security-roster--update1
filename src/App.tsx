@@ -332,7 +332,7 @@ export default function App() {
             </div>
 
             <RosterTable roster={roster} weekNumber={weekNumber} startDate={startDate} posts={posts} staff={staff} />
-            <RelieverManager staff={staff} posts={posts} shiftChanges={shiftChanges} weekNumber={weekNumber} />
+            <RelieverManager staff={staff} posts={posts} shiftChanges={shiftChanges} weekNumber={weekNumber} startDate={startDate} />
           </div>
         )}
 

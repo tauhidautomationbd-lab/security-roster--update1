@@ -34,13 +34,13 @@ export const generateWeeklyRoster = (
     if (permanentGroup === 'Reliever') return 'Reliever' as any;
     
     if (rotationCycle === 0) {
-      if (permanentGroup === 'A') return 'A';
-      if (permanentGroup === 'B') return 'B';
-      if (permanentGroup === 'C') return 'C';
-    } else if (rotationCycle === 1) {
       if (permanentGroup === 'A') return 'B';
       if (permanentGroup === 'B') return 'C';
       if (permanentGroup === 'C') return 'A';
+    } else if (rotationCycle === 1) {
+      if (permanentGroup === 'A') return 'A';
+      if (permanentGroup === 'B') return 'B';
+      if (permanentGroup === 'C') return 'C';
     } else { // 2
       if (permanentGroup === 'A') return 'C';
       if (permanentGroup === 'B') return 'A';

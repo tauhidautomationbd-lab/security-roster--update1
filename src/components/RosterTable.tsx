@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
-import { RosterAssignment, ShiftType, PostRequirement, Staff } from '../types';
-import { Clock, RefreshCcw } from 'lucide-react';
+import { RosterAssignment, ShiftType, PostRequirement, Staff, ShiftChangeRecord, LeaveRecord, OTRecord } from '../types';
+import { Clock, RefreshCcw, UserCheck, Shield } from 'lucide-react';
+import { getWeekDateRange, formatDisplayDate } from '../utils/dateUtils';
+import { calculateRelieverSchedule, getPermanentGroupForRunningShift } from '../utils/relieverAssignments';
 
 interface Props {
   roster: RosterAssignment[];
@@ -8,14 +10,30 @@ interface Props {
   startDate: string;
   posts: PostRequirement[];
   staff: Staff[];
+  shiftChanges?: ShiftChangeRecord[];
+  leaves?: LeaveRecord[];
+  ots?: OTRecord[];
 }
 
-import { getWeekDateRange, formatDisplayDate } from '../utils/dateUtils';
-
-export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, posts, staff }) => {
+export const RosterTable: React.FC<Props> = ({ 
+  roster, 
+  weekNumber, 
+  startDate, 
+  posts, 
+  staff,
+  shiftChanges = [],
+  leaves = [],
+  ots = []
+}) => {
   const endDate = getWeekDateRange(weekNumber).end;
-  // Group by Shift
-  const grouped = useMemo(() => {
+
+  // Calculate Reliever Schedule and coverage mapping
+  const relieverData = useMemo(() => {
+    return calculateRelieverSchedule(staff, posts, shiftChanges, weekNumber, startDate, leaves, ots);
+  }, [staff, posts, shiftChanges, weekNumber, startDate, leaves, ots]);
+
+  // Group by Shift and integrate relievers into shifts they cover
+  const { grouped, shiftCounts } = useMemo(() => {
     const map: Record<ShiftType | 'OT', RosterAssignment[]> = {
       A: [],
       B: [],
@@ -25,21 +43,82 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
       Leave: [],
       OT: []
     };
+
+    const counts: Record<string, { regular: number; relievers: number; total: number }> = {
+      A: { regular: 0, relievers: 0, total: 0 },
+      B: { regular: 0, relievers: 0, total: 0 },
+      C: { regular: 0, relievers: 0, total: 0 },
+      General: { regular: 0, relievers: 0, total: 0 }
+    };
+
+    // 1. Regular staff assignments from weekly roster
     roster.forEach(r => {
-      // Assuming OT is just mixed into shifts for display or grouped separately?
-      // Let's mix them but we can identify by isOT
+      // Exclude relievers from regular shift pool so we can add them cleanly with their coverage info
+      if (r.permanentGroup === 'Reliever') {
+        if (r.assignedShift === 'Reliever' || !['A', 'B', 'C', 'General'].includes(r.assignedShift)) {
+          map.Reliever.push(r);
+        }
+        return;
+      }
+
       if (map[r.assignedShift]) {
         map[r.assignedShift].push(r);
+        if (counts[r.assignedShift]) {
+          counts[r.assignedShift].regular++;
+          counts[r.assignedShift].total++;
+        }
       }
     });
-    
-    // Sort each group by Post name
-    Object.values(map).forEach(group => {
-      group.sort((a, b) => a.assignedPost.localeCompare(b.assignedPost));
+
+    // 2. Add Relievers who cover off-days for each shift ('A', 'B', 'C', 'General')
+    (['A', 'B', 'C', 'General'] as ShiftType[]).forEach(shift => {
+      const shiftCoverages = relieverData.coveragesByShift[shift] || [];
+      
+      // Group coverages by reliever ID to avoid redundant duplicate rows for the same reliever
+      const relieverMap = new Map<string, { reliever: Staff; postName: string; coverLabels: string[] }>();
+      
+      shiftCoverages.forEach(cov => {
+        if (!relieverMap.has(cov.reliever.id)) {
+          relieverMap.set(cov.reliever.id, {
+            reliever: cov.reliever,
+            postName: cov.postName,
+            coverLabels: [cov.coverLabel]
+          });
+        } else {
+          const entry = relieverMap.get(cov.reliever.id)!;
+          if (!entry.coverLabels.includes(cov.coverLabel)) {
+            entry.coverLabels.push(cov.coverLabel);
+          }
+        }
+      });
+
+      relieverMap.forEach(({ reliever, postName, coverLabels }) => {
+        map[shift].push({
+          staffId: reliever.id,
+          staffName: reliever.name,
+          role: reliever.role,
+          permanentGroup: 'Reliever',
+          assignedShift: shift,
+          assignedPost: postName,
+          offDay: reliever.offDay || '-',
+          isRelieverDuty: true,
+          relieverCoverInfo: coverLabels.join(' | ')
+        });
+
+        if (counts[shift]) {
+          counts[shift].relievers++;
+          counts[shift].total++;
+        }
+      });
     });
-    
-    return map;
-  }, [roster]);
+
+    // Sort each shift group by post name
+    Object.values(map).forEach(group => {
+      group.sort((a, b) => (a.assignedPost || '').localeCompare(b.assignedPost || ''));
+    });
+
+    return { grouped: map, shiftCounts: counts };
+  }, [roster, relieverData]);
 
   const targets = useMemo(() => {
     let A = 0, B = 0, C = 0;
@@ -56,45 +135,15 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
     B: { title: 'B (Evening)', time: 'বিকাল ৩টা - রাত ১১টা', color: 'bg-amber-100 text-amber-800' },
     C: { title: 'C (Night)', time: 'রাত ১১টা - সকাল ৬টা', color: 'bg-indigo-100 text-indigo-800' },
     General: { title: 'General Shift', time: 'সকাল ৮টা - রাত ৮টা', color: 'bg-blue-100 text-blue-800' },
-    Reliever: { title: 'Reliever Shift', time: 'যেকোনো শিফট', color: 'bg-purple-100 text-purple-800' },
+    Reliever: { title: 'Reliever Shift', time: 'যেকোনো শিফট (রিজার্ভ / সাপোর্ট)', color: 'bg-purple-100 text-purple-800' },
     Leave: { title: 'Leave / Off', time: 'ছুটি/অফ', color: 'bg-gray-100 text-gray-800' }
-  };
-
-  const getPermanentGroupForRunningShift = (runningShift: ShiftType, startDate: string) => {
-    const [y, m, d] = startDate.split('-').map(Number);
-    const currentStartDate = new Date(y, m - 1, d);
-    const anchorDate = new Date(2026, 7, 29); // 2026-08-29 (Saturday)
-    
-    currentStartDate.setHours(0, 0, 0, 0);
-    anchorDate.setHours(0, 0, 0, 0);
-    
-    const timeDiff = currentStartDate.getTime() - anchorDate.getTime();
-    const daysDiff = Math.round(timeDiff / (1000 * 60 * 60 * 24));
-    const weeksDiff = Math.floor(daysDiff / 7);
-    
-    const rotationCycle = ((weeksDiff % 3) + 3) % 3;
-
-    if (rotationCycle === 0) {
-      if (runningShift === 'B') return 'A';
-      if (runningShift === 'C') return 'B';
-      if (runningShift === 'A') return 'C';
-    } else if (rotationCycle === 1) {
-      if (runningShift === 'A') return 'A';
-      if (runningShift === 'B') return 'B';
-      if (runningShift === 'C') return 'C';
-    } else { // 2
-      if (runningShift === 'C') return 'A';
-      if (runningShift === 'A') return 'B';
-      if (runningShift === 'B') return 'C';
-    }
-    return runningShift;
   };
 
   const shiftsToRender: ShiftType[] = ['A', 'B', 'C', 'General', 'Reliever', 'Leave'];
 
   return (
     <div className="space-y-8">
-            {/* Printable Header */}
+      {/* Printable Header */}
       <div className="hidden print:block mb-8 text-center border-b-2 border-slate-800 pb-4">
         <h1 className="text-2xl font-bold text-slate-900 mb-2">সাপ্তাহিক ডিউটি রোস্টার</h1>
         <p className="text-lg text-slate-700">
@@ -106,10 +155,15 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
       {shiftsToRender.map(shift => {
         const assignments = grouped[shift];
         if (assignments.length === 0) return null;
+
+        const countInfo = shiftCounts[shift];
+        const targetCount = shift === 'A' ? targets.A : shift === 'B' ? targets.B : shift === 'C' ? targets.C : 0;
+        const totalEffective = countInfo ? countInfo.total : assignments.length;
+        const isShiftTargetApplicable = ['A', 'B', 'C'].includes(shift);
         
         return (
           <div key={shift} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className={`px-6 py-4 border-b border-slate-200 flex justify-between items-center ${shiftDetails[shift].color}`}>
+            <div className={`px-6 py-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 ${shiftDetails[shift].color}`}>
               <div className="flex items-center gap-3">
                 {['A', 'B', 'C'].includes(shift) ? (
                   <h2 className="text-lg font-bold">
@@ -121,24 +175,32 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
                   </h2>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold px-3 py-1 bg-white/40 rounded-full">
-                  Total: {assignments.length} জন
-                </span>
-                {['A', 'B', 'C'].includes(shift) && (
-                  <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
-                    assignments.length === (shift === 'A' ? targets.A : shift === 'B' ? targets.B : targets.C) ? 'bg-emerald-200/50 text-emerald-900' :
-                    assignments.length > (shift === 'A' ? targets.A : shift === 'B' ? targets.B : targets.C) ? 'bg-indigo-200/50 text-indigo-900' :
-                    'bg-rose-200/60 text-rose-900'
-                  }`}>
-                    {assignments.length === (shift === 'A' ? targets.A : shift === 'B' ? targets.B : targets.C) ? '✓ সঠিক' : 
-                     assignments.length > (shift === 'A' ? targets.A : shift === 'B' ? targets.B : targets.C) ? 
-                     `+${assignments.length - (shift === 'A' ? targets.A : shift === 'B' ? targets.B : targets.C)} জন বেশি` : 
-                     `${(shift === 'A' ? targets.A : shift === 'B' ? targets.B : targets.C) - assignments.length} জন শর্ট`}
+              
+              {/* Detailed Breakdown Header (Method 2) */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {isShiftTargetApplicable && countInfo ? (
+                  <>
+                    <span className="text-xs md:text-sm font-semibold px-3 py-1 bg-white/70 text-slate-800 rounded-full border border-slate-200/50 shadow-xs">
+                      রেগুলার: {countInfo.regular} জন + রিলেভার: {countInfo.relievers} জন = মোট: {countInfo.total} জন
+                    </span>
+                    <span className={`text-xs md:text-sm font-bold px-3 py-1 rounded-full shadow-xs ${
+                      totalEffective === targetCount ? 'bg-emerald-200/80 text-emerald-950 border border-emerald-300' :
+                      totalEffective > targetCount ? 'bg-indigo-200/80 text-indigo-950 border border-indigo-300' :
+                      'bg-rose-200/80 text-rose-950 border border-rose-300'
+                    }`}>
+                      {totalEffective === targetCount ? '✓ সঠিক' : 
+                       totalEffective > targetCount ? `+${totalEffective - targetCount} জন বেশি` : 
+                       `${targetCount - totalEffective} জন শর্ট`}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm font-semibold px-3 py-1 bg-white/60 text-slate-800 rounded-full border border-slate-200/50">
+                    Total: {assignments.length} জন
                   </span>
                 )}
               </div>
             </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
@@ -153,16 +215,45 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {assignments.map((row, idx) => (
-                    <tr key={`${row.staffId}-${idx}`} className={`hover:bg-slate-50 transition-colors ${row.isOT ? 'bg-amber-50/50' : ''}`}>
-                      <td className="px-6 py-3 text-center text-slate-500">{idx + 1}</td>
-                      <td className="px-6 py-3 font-medium text-slate-800">{row.staffName} {row.staffId !== 'Unassigned' ? `(${row.staffId})` : ''}</td>
+                    <tr 
+                      key={`${row.staffId}-${idx}`} 
+                      className={`hover:bg-slate-50 transition-colors ${
+                        row.isRelieverDuty ? 'bg-purple-50/40 hover:bg-purple-50/70' : 
+                        row.isOT ? 'bg-amber-50/50' : ''
+                      }`}
+                    >
+                      <td className="px-6 py-3 text-center text-slate-500 font-medium">{idx + 1}</td>
+                      <td className="px-6 py-3 font-medium text-slate-800">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-900">
+                            {row.staffName} {row.staffId !== 'Unassigned' ? `(${row.staffId})` : ''}
+                          </span>
+                          {/* Prominent Method 2 Reliever Cover Note */}
+                          {row.relieverCoverInfo && (
+                            <span className="inline-block mt-1 text-xs font-semibold text-purple-800 bg-purple-100/90 border border-purple-300 px-2 py-0.5 rounded w-fit">
+                              {row.relieverCoverInfo}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-6 py-3 text-slate-600">
                         {row.role === 'Guard' ? 'সিকিউরিটি গার্ড' : row.role === 'LadyGuard' ? 'লেডি গার্ড' : row.role === 'Supervisor' ? 'সুপারভাইজর' : 'অফিসার'}
                       </td>
                       <td className="px-6 py-3 font-semibold text-slate-700">
                         <div className="flex flex-col">
-                          <span className={shift === 'Leave' ? "text-rose-600" : ""}>{row.assignedPost}</span>
-                          {shift === 'Leave' && row.originalPost && <span className="text-xs text-slate-500 font-normal mt-0.5">মূল পোস্ট: {row.originalPost}</span>}
+                          <span className={shift === 'Leave' ? "text-rose-600" : ""}>
+                            {row.assignedPost}
+                          </span>
+                          {row.isRelieverDuty && (
+                            <span className="text-[11px] text-purple-600 font-normal mt-0.5">
+                              (অফ-ডে বদলি ডিউটি)
+                            </span>
+                          )}
+                          {shift === 'Leave' && row.originalPost && (
+                            <span className="text-xs text-slate-500 font-normal mt-0.5">
+                              মূল পোস্ট: {row.originalPost}
+                            </span>
+                          )}
                           
                           {/* If partial leave in normal shift, or full leave */}
                           {(row.leaveStartDate || row.leaveEndDate) && (
@@ -185,20 +276,33 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-3 text-slate-600">{row.offDay || '-'}</td>
+                      <td className="px-6 py-3 text-slate-600">
+                        {row.offDay || '-'}
+                      </td>
                       <td className="px-6 py-3 text-right">
-                        <div className="flex justify-end gap-2">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                        <div className="flex justify-end gap-2 flex-wrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            row.permanentGroup === 'Reliever' 
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                              : 'bg-slate-100 text-slate-800'
+                          }`}>
                             Gr: {row.permanentGroup === 'Reliever' ? 'রিলেভার' : shift === 'General' ? 'General' : row.permanentGroup === 'General' ? 'General' : row.permanentGroup}
                           </span>
+                          
+                          {row.isRelieverDuty && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                              <RefreshCcw className="w-3 h-3" /> অফ-ডে বদলি
+                            </span>
+                          )}
+
                           {row.isOT && (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
                               <Clock className="w-3 h-3" /> OT
                             </span>
                           )}
-                          {row.isReplacement && (
+                          {row.isReplacement && !row.isRelieverDuty && (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              <RefreshCcw className="w-3 h-3" /> বদলি
+                              <RefreshCcw className="w-3 h-3" /> ছুটি বদলি
                             </span>
                           )}
                           {row.isShiftChange && (
@@ -219,3 +323,4 @@ export const RosterTable: React.FC<Props> = ({ roster, weekNumber, startDate, po
     </div>
   );
 };
+

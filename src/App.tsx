@@ -278,6 +278,8 @@ export default function App() {
             ots={ots} 
             roster={roster} 
             startDate={startDate} 
+            shiftChanges={shiftChanges}
+            weekNumber={weekNumber}
           />
         )}
         
@@ -331,8 +333,26 @@ export default function App() {
               </div>
             </div>
 
-            <RosterTable roster={roster} weekNumber={weekNumber} startDate={startDate} posts={posts} staff={staff} />
-            <RelieverManager staff={staff} posts={posts} shiftChanges={shiftChanges} weekNumber={weekNumber} startDate={startDate} />
+            {/* Shift Roster Table with Relievers integrated (Method 2) */}
+            <RosterTable 
+              roster={roster} 
+              weekNumber={weekNumber} 
+              startDate={startDate} 
+              posts={posts} 
+              staff={staff}
+              shiftChanges={shiftChanges}
+              leaves={leaves}
+              ots={ots}
+            />
+
+            {/* Reliever Routine Table */}
+            <RelieverManager 
+              staff={staff} 
+              posts={posts} 
+              shiftChanges={shiftChanges} 
+              weekNumber={weekNumber} 
+              startDate={startDate} 
+            />
           </div>
         )}
 

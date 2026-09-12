@@ -59,6 +59,8 @@ export interface RosterAssignment {
   originalPost?: string;
   shiftChangeDates?: string;
   dailyShifts?: Record<string, ShiftType>;
+  isRelieverDuty?: boolean;
+  relieverCoverInfo?: string;
 }
 
 export interface LeaveRecord {

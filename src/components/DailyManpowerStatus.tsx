@@ -1,29 +1,29 @@
 import React, { useMemo } from 'react';
-import { RosterAssignment, PostRequirement, Staff } from '../types';
-import { postRequirements as initialPosts } from '../data';
+import { RosterAssignment, PostRequirement, Staff, ShiftChangeRecord, LeaveRecord, OTRecord } from '../types';
+import { calculateRelieverSchedule, dayNameToBn } from '../utils/relieverAssignments';
+import { CheckCircle2, AlertTriangle, Users } from 'lucide-react';
 
 interface Props {
   roster: RosterAssignment[];
   startDate: string;
   posts: PostRequirement[];
   staff: Staff[];
+  shiftChanges?: ShiftChangeRecord[];
+  weekNumber?: number;
+  leaves?: LeaveRecord[];
+  ots?: OTRecord[];
 }
 
-export const DailyManpowerStatus: React.FC<Props> = ({ roster, startDate, posts, staff }) => {
-  const days = useMemo(() => {
-    const start = new Date(startDate);
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      return {
-        iso: d.toISOString().split('T')[0],
-        date: d,
-        nameBn: d.toLocaleDateString('bn-BD', { weekday: 'short' }),
-        dayStr: d.toLocaleDateString('en-US', { weekday: 'long' })
-      };
-    });
-  }, [startDate]);
-
+export const DailyManpowerStatus: React.FC<Props> = ({ 
+  roster, 
+  startDate, 
+  posts, 
+  staff,
+  shiftChanges = [],
+  weekNumber = 1,
+  leaves = [],
+  ots = []
+}) => {
   const targets = useMemo(() => {
     let A = 0, B = 0, C = 0;
     posts.forEach(p => {
@@ -34,101 +34,84 @@ export const DailyManpowerStatus: React.FC<Props> = ({ roster, startDate, posts,
     return { A, B, C };
   }, [posts]);
 
-  const dailyManpower = useMemo(() => {
-    const result = days.map(day => ({
-        iso: day.iso,
-        nameBn: day.nameBn,
-        A: 0, B: 0, C: 0
-    }));
+  const relieverData = useMemo(() => {
+    return calculateRelieverSchedule(staff, posts, shiftChanges, weekNumber, startDate, leaves, ots);
+  }, [staff, posts, shiftChanges, weekNumber, startDate, leaves, ots]);
 
-    staff.forEach(s => {
-      const rEntries = roster.filter(r => r.staffId === s.id);
-      if (rEntries.length === 0) return;
+  const getStatusBadge = (shiftStats: { total: number; regular: number; relievers: number }, target: number) => {
+    const diff = shiftStats.total - target;
+    const isCorrect = diff === 0;
+    const isExcess = diff > 0;
 
-      days.forEach((day, idx) => {
-         const dayTime = day.date.getTime();
-         const dayStr = day.dayStr.toLowerCase();
-         
-         // 1. Find active entry for this day
-         let activeEntry = rEntries.find(r => r.isReplacement) || rEntries[0];
-         let currentShift = activeEntry.assignedShift;
-         if (activeEntry.dailyShifts && activeEntry.dailyShifts[day.dayStr]) {
-             currentShift = activeEntry.dailyShifts[day.dayStr];
-         }
-         
-         // If there's a shift change, check if it's active today
-         if (activeEntry.isShiftChange && activeEntry.shiftChangeDates) {
-            const sMatch = activeEntry.shiftChangeDates.match(/\d{4}-\d{2}-\d{2}/g);
-            if (sMatch && sMatch.length >= 1) {
-               const sTime = new Date(sMatch[0]).getTime();
-               const eTime = sMatch.length > 1 ? new Date(sMatch[1]).getTime() : sTime;
-               const isActive = (dayTime >= sTime && dayTime <= eTime);
-               if (!isActive) {
-                  // Fallback to permanent group shift if shift change is NOT active today
-                  currentShift = s.permanentGroup === 'A' || s.permanentGroup === 'Morning' ? 'A' :
-                                 s.permanentGroup === 'B' || s.permanentGroup === 'Evening' ? 'B' :
-                                 s.permanentGroup === 'C' || s.permanentGroup === 'Night' ? 'C' :
-                                 s.permanentGroup === 'General' ? 'General' :
-                                 s.permanentGroup === 'Reliever' ? 'Reliever' : currentShift;
-               }
-            }
-         }
-         
-         // 2. Check if off day or on leave today
-         let isOff = false;
-         if (currentShift === 'Leave') isOff = true;
-         if (String(activeEntry.offDay || '').trim().toLowerCase() === dayStr) isOff = true;
-         if (activeEntry.leaveStartDate) {
-            const lStart = new Date(activeEntry.leaveStartDate).getTime();
-            const lEnd = activeEntry.leaveEndDate ? new Date(activeEntry.leaveEndDate).getTime() : Infinity;
-            if (dayTime >= lStart && dayTime <= lEnd) isOff = true;
-         }
-         
-         // 3. Count if not off and belongs to A, B, or C
-         if (!isOff) {
-             // For Relievers, if they are assigned a post in A, B, C, their assignedShift will be A, B, C.
-             // If for some reason they are still 'Reliever', we don't count them in A, B, C target counts.
-             if (['A', 'B', 'C'].includes(currentShift)) {
-                 result[idx][currentShift as 'A' | 'B' | 'C']++;
-             }
-         }
-      });
-    });
-
-    return result;
-  }, [roster, days, staff, posts]);
-
-  const getStatusBadge = (count: number, target: number) => {
-    const diff = count - target;
-    if (diff === 0) return <span className="text-emerald-600 font-medium">✓ সঠিক ({count})</span>;
-    if (diff > 0) return <span className="text-indigo-600 font-medium">+{diff} বেশি ({count})</span>;
-    return <span className="text-rose-600 font-medium">{diff} শর্ট ({count})</span>;
+    return (
+      <div className="flex flex-col items-center justify-center py-1">
+        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs md:text-sm font-bold shadow-xs ${
+          isCorrect ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
+          isExcess ? 'bg-indigo-100 text-indigo-900 border border-indigo-300' :
+          'bg-rose-100 text-rose-900 border border-rose-300'
+        }`}>
+          {isCorrect && '✓ সঠিক'}
+          {isExcess && `+${diff} বেশি`}
+          {!isCorrect && !isExcess && `${diff} শর্ট`}
+          <span className="opacity-90">({shiftStats.total})</span>
+        </span>
+        <span className="text-[11px] text-slate-500 font-medium mt-1">
+          রেগুলার: {shiftStats.regular} + রিলেভার: {shiftStats.relievers}
+        </span>
+      </div>
+    );
   };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-      <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-        <h2 className="text-lg font-bold text-slate-800">প্রতিদিনের ম্যানপাওয়ার স্ট্যাটাস</h2>
+      <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Users className="w-5 h-5 text-indigo-600" />
+            প্রতিদিনের ম্যানপাওয়ার স্ট্যাটাস (প্রকৃত উপস্থিতি ও রিলেভার বদলি)
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            অফ-ডের দিন কর্মী বাদ পড়া এবং রিলেভার যুক্ত হওয়ার পর প্রতিটি শিফটের দৈনিক অন-ডিউটি সংখ্যা
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold">
+          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md">
+            ✓ সঠিক = টার্গেট পূর্ণ
+          </span>
+          <span className="px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-200 rounded-md">
+            শর্ট = ঘাটতি
+          </span>
+        </div>
       </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-center">
           <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
             <tr>
-              <th className="px-6 py-3 text-left">তারিখ</th>
-              <th className="px-6 py-3">Morning / A Shift (Target: {targets.A})</th>
-              <th className="px-6 py-3">Evening / B Shift (Target: {targets.B})</th>
-              <th className="px-6 py-3">Night / C Shift (Target: {targets.C})</th>
+              <th className="px-6 py-3.5 text-left font-semibold">তারিখ ও বার</th>
+              <th className="px-6 py-3.5 font-semibold">
+                Morning / A Shift <span className="text-xs font-normal text-slate-500">(টার্গেট: {targets.A})</span>
+              </th>
+              <th className="px-6 py-3.5 font-semibold">
+                Evening / B Shift <span className="text-xs font-normal text-slate-500">(টার্গেট: {targets.B})</span>
+              </th>
+              <th className="px-6 py-3.5 font-semibold">
+                Night / C Shift <span className="text-xs font-normal text-slate-500">(টার্গেট: {targets.C})</span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {dailyManpower.map(day => (
-              <tr key={day.iso} className="hover:bg-slate-50">
-                <td className="px-6 py-3 text-left font-medium text-slate-800">
-                  {day.iso} ({day.nameBn})
+            {relieverData.dailyManpower.map(day => (
+              <tr key={day.iso} className="hover:bg-slate-50/80 transition-colors">
+                <td className="px-6 py-3.5 text-left font-medium text-slate-800">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-900">{day.nameBn}</span>
+                    <span className="text-xs text-slate-500">{day.iso}</span>
+                  </div>
                 </td>
-                <td className="px-6 py-3">{getStatusBadge(day.A, targets.A)}</td>
-                <td className="px-6 py-3">{getStatusBadge(day.B, targets.B)}</td>
-                <td className="px-6 py-3">{getStatusBadge(day.C, targets.C)}</td>
+                <td className="px-6 py-3.5">{getStatusBadge(day.A, targets.A)}</td>
+                <td className="px-6 py-3.5">{getStatusBadge(day.B, targets.B)}</td>
+                <td className="px-6 py-3.5">{getStatusBadge(day.C, targets.C)}</td>
               </tr>
             ))}
           </tbody>
@@ -137,3 +120,4 @@ export const DailyManpowerStatus: React.FC<Props> = ({ roster, startDate, posts,
     </div>
   );
 };
+

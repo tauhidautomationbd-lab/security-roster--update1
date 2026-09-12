@@ -1,5 +1,5 @@
 import React from 'react';
-import { Staff, PostRequirement, LeaveRecord, OTRecord, RosterAssignment } from '../types';
+import { Staff, PostRequirement, LeaveRecord, OTRecord, RosterAssignment, ShiftChangeRecord } from '../types';
 import { Users, Clock, ShieldAlert, CheckCircle, AlertTriangle, UserX, Calendar, FileText } from 'lucide-react';
 import { DailyManpowerStatus } from './DailyManpowerStatus';
 import { formatDisplayDate } from '../utils/dateUtils';
@@ -11,9 +11,20 @@ interface Props {
   ots: OTRecord[];
   roster: RosterAssignment[];
   startDate: string;
+  shiftChanges?: ShiftChangeRecord[];
+  weekNumber?: number;
 }
 
-export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, startDate }) => {
+export const Dashboard: React.FC<Props> = ({ 
+  staff, 
+  posts, 
+  leaves, 
+  ots, 
+  roster, 
+  startDate,
+  shiftChanges = [],
+  weekNumber = 1
+}) => {
   const activeStaff = staff.filter(s => s.status !== 'resigned');
   const resignedStaff = staff.filter(s => s.status === 'resigned');
 
@@ -242,7 +253,16 @@ export const Dashboard: React.FC<Props> = ({ staff, posts, leaves, ots, roster, 
 
       {/* Daily Manpower Status Table */}
       <div className="mt-2">
-        <DailyManpowerStatus roster={roster} startDate={startDate} posts={posts} staff={activeStaff} />
+        <DailyManpowerStatus 
+          roster={roster} 
+          startDate={startDate} 
+          posts={posts} 
+          staff={activeStaff}
+          shiftChanges={shiftChanges}
+          weekNumber={weekNumber}
+          leaves={leaves}
+          ots={ots}
+        />
       </div>
     </div>
   );

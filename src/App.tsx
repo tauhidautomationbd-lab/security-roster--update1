@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { 
   Calendar, Users, ClipboardList, Download, LayoutDashboard, Settings, 
-  Clock4, Save, Lock, LogOut, ShieldCheck, History, Wifi, WifiOff, User, UserPlus
+  Clock4, Save, Lock, LogOut, ShieldCheck, History, Wifi, WifiOff, Menu, X, Search, ExternalLink
 } from 'lucide-react';
 import { generateWeeklyRoster } from './utils/rosterAlgorithm';
 import { RosterTable } from './components/RosterTable';
@@ -23,6 +23,7 @@ export default function App() {
   const [weekNumber, setWeekNumber] = useState<number>(1);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const auth = useAuth();
   const { currentUser, isAuthenticated, isAdmin, isSuperAdmin, logout } = auth;
@@ -95,15 +96,33 @@ export default function App() {
     saveData(currentUser);
   };
 
+  const getPageTitle = () => {
+    const item = navItems.find(n => n.id === activeTab);
+    return item ? item.label : 'ড্যাশবোর্ড';
+  };
+
+  const getPageSubtitle = () => {
+    switch (activeTab) {
+      case 'dashboard': return 'আপনার সকল সিকিউরিটি অপারেশনাল ডেটা একনজরে';
+      case 'roster': return 'সাপ্তাহিক ডিউটি রোস্টার ও রোটেশন পরিচালনা';
+      case 'staff': return 'সকল সিকিউরিটি স্টাফের তথ্য ও প্রোফাইল';
+      case 'posts': return 'ডিউটি পোস্ট এবং প্রয়োজনীয় স্টাফ সেটিংস';
+      case 'leave_ot': return 'ছুটি, বদলি এবং ওভারটাইম ম্যানেজমেন্ট';
+      case 'audit_logs': return 'সিস্টেমের সকল পরিবর্তনের লগ';
+      case 'user_management': return 'অ্যাডমিন এবং ইউজার কন্ট্রোল প্যানেল';
+      default: return '';
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col relative">
+    <div className="min-h-screen bg-slate-50 flex text-slate-900 font-sans relative">
       {/* Toast Save Notifications */}
       {saveMessage === 'success' && (
         <div className="fixed bottom-5 right-5 bg-emerald-700 text-white px-5 py-3.5 rounded-xl shadow-2xl font-medium z-50 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 border border-emerald-500">
           <Save className="w-5 h-5 text-emerald-200" />
           <div>
-            <p className="font-bold text-sm">সকল পরিবর্তন সফলভাবে ক্লাউডে সেভ হয়েছে!</p>
-            <p className="text-[11px] text-emerald-100">রিলোড করলেও তথ্য অপরিবর্তিত থাকবে ও অন্য কম্পিউটারেও আপডেট হবে।</p>
+            <p className="font-bold text-sm">সকল পরিবর্তন সফলভাবে সেভ হয়েছে!</p>
+            <p className="text-[11px] text-emerald-100">ক্লাউডে আপডেট সম্পন্ন হয়েছে।</p>
           </div>
         </div>
       )}
@@ -112,294 +131,306 @@ export default function App() {
           <span className="text-xl">⚠️</span>
           <div>
             <p className="font-bold text-sm">সেভ করতে সমস্যা হয়েছে</p>
-            <p className="text-[11px] text-rose-100">দয়া করে ইন্টারনেট সংযোগ চেক করে পুনরায় সেভ করুন।</p>
+            <p className="text-[11px] text-rose-100">ইন্টারনেট সংযোগ চেক করে পুনরায় সেভ করুন।</p>
           </div>
         </div>
       )}
 
-      {/* Main Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center py-3 md:py-0 md:h-16 gap-3">
-            
-            {/* Logo and Cloud Status Badge */}
-            <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-              <div className="flex items-center gap-2.5">
-                <div className={`p-2 rounded-xl text-white ${isAuthenticated ? 'bg-indigo-600' : 'bg-slate-700'} shadow-xs`}>
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
-                      সিকিউরিটি রোস্টার প্রো
-                    </h1>
-                    {isCloudSynced ? (
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 flex items-center gap-1" title="ক্লাউডের সাথে রিয়েল-টাইমে সংযুক্ত">
-                        <Wifi className="w-3 h-3 text-emerald-600" /> লাইভ সিঙ্কড
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-medium rounded-full border border-slate-200 flex items-center gap-1">
-                        <WifiOff className="w-3 h-3 text-slate-400" /> অফলাইন ক্যাশ
-                      </span>
-                    )}
-                  </div>
-                  {lastSavedAt && (
-                    <p className="text-[10px] text-slate-500 leading-none mt-0.5">
-                      সর্বশেষ সেভ: {new Date(lastSavedAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}
-                      {lastSavedBy ? ` (${lastSavedBy})` : ''}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Mobile Controls */}
-              <div className="flex items-center gap-2 md:hidden">
-                {isAuthenticated ? (
-                  <button 
-                    onClick={handleSave}
-                    disabled={isSaving || !isLoaded}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    {isSaving ? 'সেভ হচ্ছে...' : 'সেভ'}
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => setShowAuthModal(true)}
-                    className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm"
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                    লগইন
-                  </button>
-                )}
-              </div>
+      {/* Sidebar Navigation */}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#0F172A] text-slate-300 flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:static md:w-72 md:flex-shrink-0 shadow-xl`}>
+        <div className="p-6">
+          {/* Logo Area */}
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-sm">
+              S
             </div>
-
-            {/* Navigation and Actions */}
-            <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-              <nav className="flex space-x-1 overflow-x-auto w-full md:w-auto flex-1">
-                {navItems.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-                      activeTab === item.id
-                        ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200/60 shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <item.icon className="w-4 h-4" />
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
-
-              {/* User Account and Save Controls */}
-              <div className="flex items-center gap-2 shrink-0">
-                {isAuthenticated ? (
-                  <>
-                    <button 
-                      onClick={handleSave}
-                      disabled={isSaving || !isLoaded}
-                      className="hidden md:flex bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm disabled:opacity-50 items-center gap-1.5 whitespace-nowrap"
-                    >
-                      <Save className="w-4 h-4" />
-                      {isSaving ? 'সেভ হচ্ছে...' : 'সকল পরিবর্তন সেভ করুন'}
-                    </button>
-
-                    {/* Current User Pill */}
-                    <div className="hidden lg:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                      <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
-                        {currentUser?.name?.charAt(0) || 'U'}
-                      </div>
-                      <div className="text-left">
-                        <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[120px]">
-                          {currentUser?.name}
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-medium leading-none">
-                          {currentUser?.role}
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setShowChangePasswordModal(true)}
-                      className="flex items-center gap-1 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 px-2.5 py-2 rounded-lg text-xs font-semibold transition-colors border border-slate-200 hover:border-indigo-200 whitespace-nowrap"
-                      title="পাসওয়ার্ড পরিবর্তন করুন"
-                    >
-                      <Lock className="w-3.5 h-3.5" />
-                      <span className="hidden xl:inline">পাসওয়ার্ড</span>
-                    </button>
-
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-1 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 px-2.5 py-2 rounded-lg text-xs font-semibold transition-colors border border-slate-200 hover:border-rose-200 whitespace-nowrap"
-                      title="লগআউট করুন"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">লগআউট</span>
-                    </button>
-                  </>
-                ) : (
-                  <button 
-                    onClick={() => setShowAuthModal(true)}
-                    className="hidden md:flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap"
-                  >
-                    <Lock className="w-4 h-4" />
-                    <span>লগইন / সাইনআপ</span>
-                  </button>
-                )}
-              </div>
+            <div>
+              <h1 className="text-white font-bold text-lg leading-tight">Security Force</h1>
+              <p className="text-xs text-indigo-300">Pro Plan</p>
             </div>
           </div>
         </div>
-      </header>
 
-      {/* Auth Modal (Login / Signup) */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        auth={auth}
-      />
+        {/* Sync Status - Sidebar */}
+        <div className="px-6 pb-4">
+           {isCloudSynced ? (
+             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[11px] font-medium rounded-full border border-emerald-500/20">
+               <Wifi className="w-3.5 h-3.5" /> লাইভ সিঙ্কড
+             </span>
+           ) : (
+             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-500/10 text-slate-400 text-[11px] font-medium rounded-full border border-slate-500/20">
+               <WifiOff className="w-3.5 h-3.5" /> অফলাইন ক্যাশ
+             </span>
+           )}
+        </div>
 
-      <ChangePasswordModal
-        isOpen={showChangePasswordModal}
-        onClose={() => setShowChangePasswordModal(false)}
-        changePassword={auth.changePassword}
-      />
+        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1.5 scrollbar-hide">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id);
+                setIsMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === item.id
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'text-white' : 'text-slate-500'}`} />
+              {item.label}
+            </button>
+          ))}
+        </div>
 
-      {/* Main Tab Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 flex-1 w-full">
-        {activeTab === 'dashboard' && (
-          <Dashboard 
-            staff={staff} 
-            posts={posts} 
-            leaves={leaves} 
-            ots={ots} 
-            roster={roster} 
-            startDate={startDate} 
-            shiftChanges={shiftChanges}
-            weekNumber={weekNumber}
-          />
-        )}
-        
-        {activeTab === 'roster' && (
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-800">অ্যালগরিদম রোস্টার জেনারেটর</h2>
-                <p className="text-sm text-slate-500 mt-1">
-                  অটোমেটিক রোটেশন এবং ছুটি/ওভারটাইম হিসাব করে রোস্টার তৈরি করা হয়েছে।
-                </p>
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-slate-800/60">
+          {isAuthenticated ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-sm">
+                  {currentUser?.name?.charAt(0) || 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-200 truncate">{currentUser?.name}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{currentUser?.role}</p>
+                </div>
               </div>
-              
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg border border-slate-200">
-                  <label htmlFor="weekSelect" className="text-sm font-medium text-slate-700">সপ্তাহ নির্বাচন:</label>
-                  <select 
-                    id="weekSelect"
-                    className="bg-transparent border-none text-sm font-bold text-indigo-700 focus:ring-0 cursor-pointer p-0 pr-6"
-                    value={weekNumber}
-                    onChange={(e) => setWeekNumber(Number(e.target.value))}
-                  >
-                    {Array.from({length: 30}).map((_, i) => {
-                      const w = i + 1;
-                      const { start } = getWeekDateRange(w);
-                      const d = parseLocalDate(start);
-                      const monthName = d.toLocaleString('bn-BD', { month: 'long', year: 'numeric' });
-                      return <option key={w} value={w}>সপ্তাহ {w} ({monthName})</option>
-                    })}
-                  </select>
-                </div>
-                
-                <div className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg border border-slate-200">
-                  <span className="text-sm font-medium text-slate-700">তারিখ:</span>
-                  <span className="text-sm font-bold text-indigo-700">
-                    {formatDisplayDate(startDate)}
-                  </span>
-                  <span className="text-sm text-slate-500">হতে</span>
-                  <span className="text-sm font-bold text-indigo-700">
-                    {formatDisplayDate(endDate)}
-                  </span>
-                </div>
-                
-                <button 
-                  onClick={() => window.print()}
-                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button
+                  onClick={() => setShowChangePasswordModal(true)}
+                  className="flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 py-2 rounded-md transition-colors"
                 >
-                  <Download className="w-4 h-4" />
-                  প্রিন্ট / PDF
+                  <Lock className="w-3.5 h-3.5" />
+                  পাসওয়ার্ড
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-rose-400 bg-slate-800 hover:bg-slate-700 py-2 rounded-md transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  লগআউট
                 </button>
               </div>
             </div>
+          ) : (
+            <button 
+              onClick={() => setShowAuthModal(true)}
+              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Lock className="w-4 h-4" />
+              লগইন / সাইনআপ
+            </button>
+          )}
+        </div>
+      </aside>
 
-            {/* Shift Roster Table with Relievers integrated (Method 2) */}
-            <RosterTable 
-              roster={roster} 
-              weekNumber={weekNumber} 
-              startDate={startDate} 
-              posts={posts} 
-              staff={staff}
-              shiftChanges={shiftChanges}
-              leaves={leaves}
-              ots={ots}
-            />
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 z-30 md:hidden backdrop-blur-sm"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
 
-            {/* Reliever Routine Table */}
-            <RelieverManager 
-              staff={staff} 
-              posts={posts} 
-              shiftChanges={shiftChanges} 
-              weekNumber={weekNumber} 
-              startDate={startDate} 
-            />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-slate-50">
+        
+        {/* Top Header Bar */}
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 sm:px-8 shrink-0 z-10 shadow-sm">
+          <div className="flex items-center gap-4 flex-1">
+            <button 
+              className="md:hidden text-slate-500 hover:text-slate-700"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+
+            {/* Simulated Search Bar */}
+            <div className="hidden sm:flex items-center bg-slate-100 px-3 py-2 rounded-lg text-slate-500 w-full max-w-sm border border-slate-200/60 focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-300 transition-all">
+              <Search className="w-4 h-4 mr-2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="স্টাফ বা পোস্ট সার্চ করুন..." 
+                className="bg-transparent border-none outline-none text-sm w-full placeholder-slate-400 text-slate-700"
+              />
+              <div className="ml-2 flex items-center gap-1">
+                <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[10px] font-sans font-semibold text-slate-400 bg-white border border-slate-200 rounded">⌘</kbd>
+                <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[10px] font-sans font-semibold text-slate-400 bg-white border border-slate-200 rounded">K</kbd>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Authenticated Tabs */}
-        {isAuthenticated && activeTab === 'staff' && (
-          <StaffManager 
-            staff={staff} 
-            setStaff={setStaff} 
-            posts={posts} 
-            currentUser={currentUser} 
-          />
-        )}
-        
-        {isAuthenticated && activeTab === 'posts' && (
-          <PostManager 
-            posts={posts} 
-            setPosts={setPosts} 
-            staff={staff} 
-          />
-        )}
-        
-        {isAuthenticated && activeTab === 'leave_ot' && (
-          <LeaveOTManager 
-            staff={staff} 
-            posts={posts} 
-            leaves={leaves} 
-            setLeaves={setLeaves} 
-            ots={ots} 
-            setOts={setOts} 
-            shiftChanges={shiftChanges} 
-            setShiftChanges={setShiftChanges} 
-          />
-        )}
+          <div className="flex items-center gap-4">
+            <a href="#" className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
+              <ExternalLink className="w-4 h-4" />
+              পাবলিক ডিউটি পোর্টাল
+            </a>
+            
+            {isAuthenticated && (
+              <button 
+                onClick={handleSave}
+                disabled={isSaving || !isLoaded}
+                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap"
+              >
+                <Save className="w-4 h-4" />
+                <span className="hidden sm:inline">{isSaving ? 'সেভ হচ্ছে...' : 'সেভ করুন'}</span>
+                <span className="sm:hidden">{isSaving ? '...' : 'সেভ'}</span>
+              </button>
+            )}
+          </div>
+        </header>
 
-        {isAuthenticated && isAdmin && activeTab === 'audit_logs' && (
-          <AuditLogView />
-        )}
-        
-        {isAuthenticated && isSuperAdmin && activeTab === 'user_management' && (
-          <UserManagement 
-            users={auth.registeredUsers} 
-            updateUserStatus={auth.updateUserStatus} 
-            deleteUser={auth.deleteUser}
-            adminResetPassword={auth.adminResetPassword}
-          />
-        )}
-      </main>
+        {/* Page Content Scrollable Area */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 w-full">
+            
+            {/* Page Title Header */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{getPageTitle()}</h2>
+                <p className="text-slate-500 mt-1 text-sm">{getPageSubtitle()}</p>
+              </div>
+              
+              {activeTab === 'roster' && (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+                    <label htmlFor="weekSelect" className="text-xs font-medium text-slate-500 mr-2">সপ্তাহ:</label>
+                    <select 
+                      id="weekSelect"
+                      className="bg-transparent border-none text-sm font-bold text-indigo-700 focus:ring-0 cursor-pointer p-0 pr-6"
+                      value={weekNumber}
+                      onChange={(e) => setWeekNumber(Number(e.target.value))}
+                    >
+                      {Array.from({length: 30}).map((_, i) => {
+                        const w = i + 1;
+                        const { start } = getWeekDateRange(w);
+                        const d = parseLocalDate(start);
+                        const monthName = d.toLocaleString('bn-BD', { month: 'long', year: 'numeric' });
+                        return <option key={w} value={w}>সপ্তাহ {w} ({monthName})</option>
+                      })}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Auth Modal (Login / Signup) */}
+            <AuthModal
+              isOpen={showAuthModal}
+              onClose={() => setShowAuthModal(false)}
+              auth={auth}
+            />
+
+            <ChangePasswordModal
+              isOpen={showChangePasswordModal}
+              onClose={() => setShowChangePasswordModal(false)}
+              changePassword={auth.changePassword}
+            />
+
+            {/* Content Modules */}
+            {activeTab === 'dashboard' && (
+              <Dashboard 
+                staff={staff} 
+                posts={posts} 
+                leaves={leaves} 
+                ots={ots} 
+                roster={roster} 
+                startDate={startDate} 
+                shiftChanges={shiftChanges}
+                weekNumber={weekNumber}
+              />
+            )}
+            
+            {activeTab === 'roster' && (
+              <div className="space-y-6">
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-slate-600">রোস্টার পিরিয়ড:</span>
+                    <span className="font-bold text-indigo-700">{formatDisplayDate(startDate)}</span>
+                    <span className="text-slate-400">হতে</span>
+                    <span className="font-bold text-indigo-700">{formatDisplayDate(endDate)}</span>
+                  </div>
+                  
+                  <button 
+                    onClick={() => window.print()}
+                    className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    প্রিন্ট রোস্টার
+                  </button>
+                </div>
+
+                {/* Shift Roster Table with Relievers integrated */}
+                <RosterTable 
+                  roster={roster} 
+                  weekNumber={weekNumber} 
+                  startDate={startDate} 
+                  posts={posts} 
+                  staff={staff}
+                  shiftChanges={shiftChanges}
+                  leaves={leaves}
+                  ots={ots}
+                />
+
+                {/* Reliever Routine Table */}
+                <RelieverManager 
+                  staff={staff} 
+                  posts={posts} 
+                  shiftChanges={shiftChanges} 
+                  weekNumber={weekNumber} 
+                  startDate={startDate} 
+                />
+              </div>
+            )}
+
+            {/* Authenticated Tabs */}
+            {isAuthenticated && activeTab === 'staff' && (
+              <StaffManager 
+                staff={staff} 
+                setStaff={setStaff} 
+                posts={posts} 
+                currentUser={currentUser} 
+              />
+            )}
+            
+            {isAuthenticated && activeTab === 'posts' && (
+              <PostManager 
+                posts={posts} 
+                setPosts={setPosts} 
+                staff={staff} 
+              />
+            )}
+            
+            {isAuthenticated && activeTab === 'leave_ot' && (
+              <LeaveOTManager 
+                staff={staff} 
+                posts={posts} 
+                leaves={leaves} 
+                setLeaves={setLeaves} 
+                ots={ots} 
+                setOts={setOts} 
+                shiftChanges={shiftChanges} 
+                setShiftChanges={setShiftChanges} 
+              />
+            )}
+
+            {isAuthenticated && isAdmin && activeTab === 'audit_logs' && (
+              <AuditLogView />
+            )}
+            
+            {isAuthenticated && isSuperAdmin && activeTab === 'user_management' && (
+              <UserManagement 
+                users={auth.registeredUsers} 
+                updateUserStatus={auth.updateUserStatus} 
+                deleteUser={auth.deleteUser}
+                adminResetPassword={auth.adminResetPassword}
+              />
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
